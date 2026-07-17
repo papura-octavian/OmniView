@@ -1,0 +1,119 @@
+{
+  "name": "omniview",
+  "productName": "OmniView",
+  "version": "1.0.0",
+  "description": "Vizualizator universal de imagini si video pentru Windows: HEIC, HEIF, AVIF, HEVC, TIFF si multe altele",
+  "main": "src/main.js",
+  "author": "kebulann",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "heic-decode": "^2.0.0",
+    "utif2": "^4.1.0"
+  },
+  "build": {
+    "appId": "com.kebulann.omniview",
+    "productName": "OmniView",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "fileAssociations": [
+        {
+          "ext": "heic",
+          "name": "HEIC Image",
+          "role": "Viewer"
+        },
+        {
+          "ext": "heif",
+          "name": "HEIF Image",
+          "role": "Viewer"
+        },
+        {
+          "ext": "avif",
+          "name": "AVIF Image",
+          "role": "Viewer"
+        },
+        {
+          "ext": "tif",
+          "name": "TIFF Image",
+          "role": "Viewer"
+        },
+        {
+          "ext": "tiff",
+          "name": "TIFF Image",
+          "role": "Viewer"
+        },
+        {
+          "ext": "webp",
+          "name": "WebP Image",
+          "role": "Viewer"
+        },
+        {
+          "ext": "hevc",
+          "name": "HEVC Video",
+          "role": "Viewer"
+        },
+        {
+          "ext": "h265",
+          "name": "H.265 Video",
+          "role": "Viewer"
+        },
+        {
+          "ext": "mov",
+          "name": "QuickTime Video",
+          "role": "Viewer"
+        },
+        {
+          "ext": "mkv",
+          "name": "Matroska Video",
+          "role": "Viewer"
+        },
+        {
+          "ext": "mp4",
+          "name": "MP4 Video",
+          "role": "Viewer"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "ffmpeg-static@5.3.0": true
+  }
+}

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: blob: data:; media-src 'self' file: blob:; style-src 'self'" />
+  <title>OmniView</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header id="toolbar">
+    <button id="btn-open" title="Deschide (Ctrl+O)">📂 Deschide</button>
+    <div id="file-info">
+      <span id="file-name">Niciun fișier deschis</span>
+      <span id="file-counter"></span>
+    </div>
+    <div class="spacer"></div>
+    <button id="btn-prev" title="Anterior (←)" disabled>◀</button>
+    <button id="btn-next" title="Următor (→)" disabled>▶</button>
+    <span class="sep"></span>
+    <button id="btn-zoom-out" title="Micșorează (-)" disabled>−</button>
+    <span id="zoom-label">–</span>
+    <button id="btn-zoom-in" title="Mărește (+)" disabled>+</button>
+    <button id="btn-fit" title="Potrivește în fereastră (0)" disabled>Fit</button>
+    <button id="btn-100" title="Mărime reală (1)" disabled>1:1</button>
+    <button id="btn-rotate" title="Rotește 90° (R)" disabled>⟳</button>
+    <span class="sep"></span>
+    <button id="btn-save-png" title="Salvează ca PNG (Ctrl+S)" disabled>PNG</button>
+    <button id="btn-save-jpg" title="Salvează ca JPEG" disabled>JPG</button>
+    <button id="btn-folder" title="Arată în Explorer" disabled>📁</button>
+  </header>
+
+  <main id="viewport">
+    <div id="empty-state">
+      <div class="big-icon">🖼️</div>
+      <p>Deschide un fișier sau trage-l aici</p>
+      <p class="hint">HEIC · HEIF · AVIF · TIFF · WebP · JPG · PNG · GIF · BMP · SVG<br />
+        HEVC/H.265 · MP4 · MOV · MKV · WebM · AVI · WMV · TS</p>
+    </div>
+    <div id="stage">
+      <canvas id="canvas" hidden></canvas>
+      <img id="image" hidden alt="" />
+      <video id="video" hidden controls></video>
+    </div>
+    <div id="drop-overlay" hidden><span>Eliberează pentru a deschide</span></div>
+    <div id="busy-overlay" hidden>
+      <div class="busy-box">
+        <p id="busy-text">Se încarcă…</p>
+        <div class="progress"><div id="progress-bar"></div></div>
+      </div>
+    </div>
+    <div id="toast" hidden></div>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
