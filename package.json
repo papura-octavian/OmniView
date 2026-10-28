@@ -1,19 +1,18 @@
 {
   "name": "omniview",
   "productName": "OmniView",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Vizualizator universal de imagini si video pentru Windows: HEIC, HEIF, AVIF, HEVC, TIFF si multe altele",
   "main": "src/main.js",
   "author": "kebulann",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "icon": "node scripts/make-icon.js",
     "dist": "electron-builder --win",
     "dist:portable": "electron-builder --win portable"
   },
   "devDependencies": {
-    "electron": "^33.2.0",
+    "electron": "^44.7.1",
     "electron-builder": "^25.1.8"
   },
   "dependencies": {
@@ -34,6 +33,7 @@
       "node_modules/ffmpeg-static/**"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         { "target": "nsis", "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
@@ -75,11 +75,13 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   },
   "allowScripts": {
-    "electron@33.4.11": true,
+    "electron@44.7.1": true,
     "ffmpeg-static@5.3.0": true
   }
 }

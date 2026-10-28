@@ -44,8 +44,12 @@ const state = {
   mediaW: 0,
   mediaH: 0,
   loadToken: 0,
+  converting: false,
   toastTimer: null
 };
+
+// Keeps the neighbours of a native image decoded, so arrow-key browsing shows them instantly.
+const preloaded = new Map();
 
 // ---------- helpers ----------
 
@@ -182,6 +186,11 @@ els.viewport.addEventListener('dblclick', (e) => {
 
 async function loadPath(filePath, { refreshSiblings = true } = {}) {
   const token = ++state.loadToken;
+  // A conversion for the file we are leaving would only burn CPU now
+  if (state.converting) {
+    state.converting = false;
+    window.api.cancelVideo();
+  }
   setBusy('Se încarcă…');
   try {
     const info = await window.api.loadFile(filePath);
@@ -198,7 +207,9 @@ async function loadPath(filePath, { refreshSiblings = true } = {}) {
       const ctx = els.canvas.getContext('2d');
       els.canvas.width = info.width;
       els.canvas.height = info.height;
-      const imgData = new ImageData(new Uint8ClampedArray(info.data), info.width, info.height);
+      // View the IPC buffer directly instead of copying tens of megabytes again
+      const pixels = new Uint8ClampedArray(info.data.buffer, info.data.byteOffset, info.data.byteLength);
+      const imgData = new ImageData(pixels, info.width, info.height);
       ctx.putImageData(imgData, 0, 0);
       state.mediaW = info.width;
       state.mediaH = info.height;
@@ -211,6 +222,8 @@ async function loadPath(filePath, { refreshSiblings = true } = {}) {
         els.image.onerror = () => reject(new Error('Imaginea nu a putut fi decodată'));
         els.image.src = info.url;
       });
+      // Finish decoding before showing, so large photos do not appear in stripes
+      await els.image.decode().catch(() => {});
       if (token !== state.loadToken) return;
       state.mediaW = els.image.naturalWidth;
       state.mediaH = els.image.naturalHeight;
@@ -219,31 +232,42 @@ async function loadPath(filePath, { refreshSiblings = true } = {}) {
       setBusy(null);
     } else if (info.type === 'video') {
       els.video.hidden = false;
-      const playDirect = () => new Promise((resolve, reject) => {
-        els.video.onloadedmetadata = () => resolve();
-        els.video.onerror = () => reject(new Error('direct playback failed'));
-        els.video.src = info.url;
+      // Resolves once the video has metadata. A codec Chromium cannot decode sometimes still yields
+      // metadata but no picture (videoWidth 0), so that counts as a failure unless allowEmpty.
+      const tryPlay = (url, allowEmpty = false) => new Promise((resolve, reject) => {
+        els.video.onloadedmetadata = () => {
+          if (els.video.videoWidth > 0 || allowEmpty) resolve();
+          else reject(new Error('no video track decoded'));
+        };
+        els.video.onerror = () => reject(new Error('playback failed'));
+        els.video.src = url;
       });
 
-      let needTranscode = info.forceTranscode;
-      if (!needTranscode) {
-        try {
-          await playDirect();
-        } catch {
-          needTranscode = true;
-        }
+      let played = false;
+      if (!info.forceTranscode) {
+        played = await tryPlay(info.url).then(() => true, () => false);
       }
       if (token !== state.loadToken) return;
 
-      if (needTranscode) {
-        setBusy('Se convertește video (codec nesuportat nativ)…', { determinate: true });
-        const { url } = await window.api.transcode(info.path);
+      // Fallbacks: rewrap the stream into MP4 when the codec allows it (seconds), otherwise convert to H.264.
+      for (const mode of ['auto', 'transcode']) {
+        if (played) break;
+        setBusy('Se pregătește video…', { determinate: true });
+        state.converting = true;
+        let prepared;
+        try {
+          prepared = await window.api.prepareVideo(info.path, mode);
+        } finally {
+          if (token === state.loadToken) state.converting = false;
+        }
         if (token !== state.loadToken) return;
-        await new Promise((resolve, reject) => {
-          els.video.onloadedmetadata = () => resolve();
-          els.video.onerror = () => reject(new Error('Redarea video a eșuat chiar și după conversie'));
-          els.video.src = url;
-        });
+        const last = prepared.mode === 'transcode';
+        try {
+          await tryPlay(prepared.url, last);
+          played = true;
+        } catch (err) {
+          if (last) throw new Error('Redarea video a eșuat chiar și după conversie');
+        }
         if (token !== state.loadToken) return;
       }
 
@@ -265,12 +289,30 @@ async function loadPath(filePath, { refreshSiblings = true } = {}) {
     els.fileCounter.textContent =
       state.files.length > 1 ? `${state.index + 1} / ${state.files.length}` : '';
     updateButtons();
+    prefetchNeighbours();
   } catch (err) {
     if (token !== state.loadToken) return;
+    if (/cancelled/.test(String(err && err.message))) return;
     setBusy(null);
     showToast('Nu am putut deschide fișierul:\n' + (err.message || err));
     updateButtons();
   }
+}
+
+async function prefetchNeighbours() {
+  if (state.files.length < 2) return;
+  const n = state.files.length;
+  const around = [...new Set([state.files[(state.index + 1) % n], state.files[(state.index - 1 + n) % n]])];
+  // Main decodes HEIC/TIFF neighbours into its cache and returns URLs for the formats Chromium decodes itself
+  const urls = await window.api.prefetch(around).catch(() => ({}));
+  for (const [p, url] of Object.entries(urls)) {
+    if (preloaded.has(p)) continue;
+    const img = new Image();
+    img.src = url;
+    img.decode().catch(() => {});
+    preloaded.set(p, img);
+  }
+  for (const p of preloaded.keys()) if (!(p in urls)) preloaded.delete(p);
 }
 
 function navigate(delta) {
@@ -284,21 +326,21 @@ function navigate(delta) {
 async function saveAs(format) {
   if (!state.currentPath || state.currentType === 'video') return;
   try {
-    let source;
-    if (state.currentType === 'raster') {
-      source = els.canvas;
-    } else {
-      const c = document.createElement('canvas');
-      c.width = state.mediaW;
-      c.height = state.mediaH;
-      const ctx = c.getContext('2d');
-      if (format === 'jpeg') {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, c.width, c.height);
-      }
-      ctx.drawImage(els.image, 0, 0);
-      source = c;
+    // Save what is on screen, rotation included
+    const src = state.currentType === 'raster' ? els.canvas : els.image;
+    const rot = ((state.rotation % 360) + 360) % 360;
+    const swap = rot === 90 || rot === 270;
+    const source = document.createElement('canvas');
+    source.width = swap ? state.mediaH : state.mediaW;
+    source.height = swap ? state.mediaW : state.mediaH;
+    const ctx = source.getContext('2d');
+    if (format === 'jpeg') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, source.width, source.height);
     }
+    ctx.translate(source.width / 2, source.height / 2);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.drawImage(src, -state.mediaW / 2, -state.mediaH / 2, state.mediaW, state.mediaH);
     const blob = await new Promise((resolve) =>
       source.toBlob(resolve, format === 'jpeg' ? 'image/jpeg' : 'image/png', 0.92)
     );
@@ -389,7 +431,9 @@ window.addEventListener('drop', (e) => {
 // ---------- IPC events ----------
 
 window.api.onOpenPath((p) => loadPath(p));
-window.api.onTranscodeProgress(({ percent }) => {
+window.api.onTranscodeProgress(({ percent, mode }) => {
   els.progressBar.style.width = percent + '%';
-  els.busyText.textContent = `Se convertește video… ${percent}%`;
+  els.busyText.textContent = mode === 'remux'
+    ? `Se pregătește video… ${percent}%`
+    : `Se convertește video (codec nesuportat nativ)… ${percent}%`;
 });

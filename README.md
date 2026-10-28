@@ -19,7 +19,8 @@ Vizualizator universal de imagini și video pentru Windows. Deschide formatele �
 - 🔍 Zoom (rotița mouse-ului, centrat pe cursor), pan (tragere), fit / 1:1, rotire 90°
 - ◀▶ Navigare prin toate fișierele media din același folder (săgeți stânga/dreapta)
 - 💾 Conversie / salvare ca **PNG** sau **JPEG** (pentru orice imagine, inclusiv HEIC)
-- 🎬 Video HEVC convertit automat în fundal cu bară de progres când sistemul nu-l poate reda
+- 🎬 Video HEVC convertit automat în fundal cu bară de progres când sistemul nu-l poate reda; când codec-ul e compatibil (H.264/H.265 în .ts, .mts, .hevc), doar re-ambalat în MP4, în câteva secunde
+- ⚡ Poza următoare și cea anterioară sunt pregătite în avans, deci săgețile schimbă imaginea instant
 - ⌨️ Scurtături: `Ctrl+O` deschide · `Ctrl+S` salvează PNG · `←/→` navighează · `+/-` zoom · `0` fit · `1` 100% · `R` rotire · `F` fullscreen
 
 ## Instalare (utilizatori)
@@ -50,9 +51,10 @@ După câteva minute apare un Release nou cu executabilele atașate. Se poate ru
 ## Arhitectură pe scurt
 
 - **Electron** — fereastra și UI (dark mode)
-- **Main process** ([src/main.js](src/main.js)) — decodare HEIC/HEIF (`heic-decode`), TIFF (`utif2`), transcodare video (`ffmpeg-static`), dialoguri, asocieri de fișiere
+- **Main process** ([src/main.js](src/main.js)) — transcodare/remux video (`ffmpeg-static`), cache pentru imaginile decodate, dialoguri, asocieri de fișiere
+- **Decoder** ([src/decoder-worker.js](src/decoder-worker.js)) — decodare HEIC/HEIF (`heic-decode`) și TIFF (`utif2`) pe thread-uri separate, ca fereastra să nu se blocheze
 - **Renderer** ([src/renderer](src/renderer)) — canvas pentru imaginile decodate software, `<img>`/`<video>` pentru formatele native, zoom/pan/rotire
-- Videoclipurile pe care Chromium nu le poate reda sunt transcodate on-the-fly în H.264 într-un folder temporar (curățat la închidere), cu cache ca să nu se refacă conversia
+- Videoclipurile pe care Chromium nu le poate reda sunt re-ambalate sau transcodate în H.264 (max. 1920 px) într-un folder temporar (curățat la închidere), cu cache ca să nu se refacă conversia; o conversie se oprește dacă treci la alt fișier
 
 ## Licență
 
